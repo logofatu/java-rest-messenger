@@ -1,8 +1,8 @@
 package logofatu.galina.messenger.resources;
 
-import java.util.ArrayList;
 import java.util.List;
 
+import javax.ws.rs.BeanParam;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -14,6 +14,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
 import logofatu.galina.messenger.model.Message;
+import logofatu.galina.messenger.resources.beans.MessageFilterBean;
 import logofatu.galina.messenger.service.MessageService;
 
 @Path("/messages")
@@ -24,7 +25,14 @@ public class MessageResource {
 	MessageService messageService = new MessageService();
 	
 	@GET
-	public List<Message> getMessages() {
+	public List<Message> getMessages(@BeanParam MessageFilterBean filterBean) {
+		if (filterBean.getYear() > 0) {
+			return messageService.getAllMessagesForYear(filterBean.getYear());
+		}
+		if (filterBean.getStart() >= 0 && filterBean.getSize() > 0) {
+			return messageService.getAllMessagesPaginated(filterBean.getStart(), filterBean.getSize());
+		}
+		
 		return messageService.getAllMessages();
 	}
 	
@@ -35,12 +43,10 @@ public class MessageResource {
 	
 	@PUT
 	@Path("/{messageId}")
-	public List<Message> updateMessage(@PathParam("messageId") long id, Message message) {
+	public Message updateMessage(@PathParam("messageId") long id, Message message) {
 		message.setId(id);
 		
-		messageService.updateMessage(message);
-
-		return this.getMessages();
+		return messageService.updateMessage(message);
 	}
 	
 	@DELETE
@@ -53,5 +59,10 @@ public class MessageResource {
 	@Path("/{messageId}")
 	public Message getMessage(@PathParam("messageId") long id) {
 		return messageService.getMessage(id);
+	}
+	
+	@Path("/{messageId}/comments")
+	public CommentResource getCommentResource() {
+		return new CommentResource();
 	}
 }
