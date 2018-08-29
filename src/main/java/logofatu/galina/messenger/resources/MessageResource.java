@@ -1,7 +1,6 @@
 package logofatu.galina.messenger.resources;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
 
 import javax.ws.rs.BeanParam;
@@ -25,12 +24,31 @@ import logofatu.galina.messenger.service.MessageService;
 @Path("/messages")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
+//@Produces(value = { MediaType.APPLICATION_JSON, MediaType.TEXT_XML })
 public class MessageResource {
 
 	MessageService messageService = new MessageService();
 	
 	@GET
-	public List<Message> getMessages(@BeanParam MessageFilterBean filterBean) {
+	@Produces(MediaType.APPLICATION_JSON)
+	public List<Message> getJsonMessages(@BeanParam MessageFilterBean filterBean) {
+		System.out.println("JSON method called!");
+		
+		if (filterBean.getYear() > 0) {
+			return messageService.getAllMessagesForYear(filterBean.getYear());
+		}
+		if (filterBean.getStart() >= 0 && filterBean.getSize() > 0) {
+			return messageService.getAllMessagesPaginated(filterBean.getStart(), filterBean.getSize());
+		}
+		
+		return messageService.getAllMessages();
+	}
+	
+	@GET
+	@Produces(MediaType.TEXT_XML)
+	public List<Message> getXmlMessages(@BeanParam MessageFilterBean filterBean) {
+		System.out.println("XML method called!");
+		
 		if (filterBean.getYear() > 0) {
 			return messageService.getAllMessagesForYear(filterBean.getYear());
 		}
@@ -43,7 +61,7 @@ public class MessageResource {
 	
 	@POST
 	public Response addMessage(Message message,
-							  @Context UriInfo uriInfo) throws URISyntaxException {
+							  @Context UriInfo uriInfo) {
 		Message newMessage = messageService.addMessage(message);
 //		return Response.status(Status.CREATED)
 //				.entity(newMessage)
@@ -75,8 +93,42 @@ public class MessageResource {
 	
 	@GET
 	@Path("/{messageId}")
-	public Message getMessage(@PathParam("messageId") long id) {
-		return messageService.getMessage(id);
+	public Message getMessage(@PathParam("messageId") long id, @Context UriInfo uriInfo) {
+		Message message = messageService.getMessage(id);
+		message.addLink(getUriForSelf(uriInfo, message), "self");
+		message.addLink(getUriForProfile(uriInfo, message), "profile");
+		message.addLink(getUriForComments(uriInfo, message), "comments");
+		
+		return message;
+	}
+
+	private String getUriForComments(UriInfo uriInfo, Message message) {
+		URI uri = uriInfo.getBaseUriBuilder()					// http://localhost:9080/messenger/webapi
+				 .path(MessageResource.class)					//				/messages
+				 .path(MessageResource.class, "getCommentResource")
+//				 .path(Long.toString(message.getId()))			//				/{messageId}
+				 .path(CommentResource.class)					//				/comments
+				 .resolveTemplate("messageId", message.getId())
+				 .build();
+		
+		return uri.toString();
+	}
+
+	private String getUriForProfile(UriInfo uriInfo, Message message) {
+		URI uri = uriInfo.getBaseUriBuilder()					// http://localhost:9080/messenger/webapi
+				 .path(ProfileResource.class)						//				/profiles
+				 .path(message.getAuthor())							//				/{profileName}
+				 .build();
+		return uri.toString();
+	}
+
+	private String getUriForSelf(UriInfo uriInfo, Message message) {
+		String uri = uriInfo.getBaseUriBuilder()					// http://localhost:9080/messenger/webapi
+					 .path(MessageResource.class)					//				/messages
+					 .path(Long.toString(message.getId()))			//				/{messageId}
+					 .build()										
+					 .toString();
+		return uri;
 	}
 	
 	@Path("/{messageId}/comments")
